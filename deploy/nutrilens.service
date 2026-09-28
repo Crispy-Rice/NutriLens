@@ -1,0 +1,19 @@
+[Unit]
+Description=NutriLens Backend (FastAPI)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/nutrilens/backend
+# 注意：workers=1，因为 SSE 流式接口（/api/analyze/stream、对话轮次流）
+# 必须单进程，多进程会弄乱流。端口 8010 是本项目在 day05 的默认后端端口。
+ExecStart=/home/ubuntu/nutrilens/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8010 --workers 1
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+Environment=HOME=/home/ubuntu
+EnvironmentFile=/home/ubuntu/nutrilens/.env
+
+[Install]
+WantedBy=multi-user.target

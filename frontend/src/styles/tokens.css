@@ -1,0 +1,130 @@
+/*
+ * Design tokens. One place to change the whole look.
+ * Palette direction: fresh teal-green (food, freshness, health) on warm
+ * neutral paper, so it reads calm rather than clinical.
+ */
+
+:root {
+  /* --- surfaces --- */
+  --c-bg: #f6f7f3;
+  --c-bg-tint: #eef2ec;
+  --c-surface: #ffffff;
+  --c-surface-2: #f2f5f1;
+  --c-surface-3: #e8ede6;
+
+  /* --- text --- */
+  --c-text: #1a211c;
+  --c-text-muted: #5a655a;
+  --c-text-subtle: #8b968a;
+  --c-text-inverse: #ffffff;
+
+  /* --- lines --- */
+  --c-border: #e0e6dc;
+  --c-border-strong: #ccd6c8;
+
+  /* --- brand --- */
+  --c-primary: #157f68;
+  --c-primary-hover: #116654;
+  --c-primary-active: #0d5142;
+  --c-primary-soft: #e3f2ed;
+  --c-primary-ring: rgba(21, 127, 104, 0.35);
+
+  /* --- semantic --- */
+  --c-accent: #c9822a;
+  --c-accent-soft: #fbf1e0;
+  --c-warn: #b06a12;
+  --c-warn-soft: #fdf3e3;
+  --c-danger: #b23c26;
+  --c-danger-soft: #fbeae6;
+  --c-info: #2f6b8f;
+  --c-info-soft: #e8f1f7;
+
+  /* --- radii --- */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-full: 999px;
+
+  /* --- spacing --- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  /* --- elevation --- */
+  --sh-1: 0 1px 2px rgba(26, 33, 28, 0.05);
+  --sh-2: 0 2px 8px rgba(26, 33, 28, 0.07), 0 1px 2px rgba(26, 33, 28, 0.04);
+  --sh-3: 0 12px 32px rgba(26, 33, 28, 0.1), 0 2px 8px rgba(26, 33, 28, 0.05);
+
+  /* --- type --- */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Source Han Sans SC', 'Noto Sans CJK SC',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', 'Cascadia Mono',
+    'Liberation Mono', Menlo, Consolas, monospace;
+
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-base: 0.9375rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.375rem;
+  --fs-2xl: 1.75rem;
+  --fs-3xl: 2.25rem;
+
+  --lh-tight: 1.25;
+  --lh-base: 1.6;
+
+  /* --- motion --- */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-fast: 120ms;
+  --dur: 220ms;
+
+  /* --- layout --- */
+  --page-max: 1080px;
+  --tap-min: 44px;
+}
+
+/* Dark theme is defined up front so every component that uses tokens gets it
+   for free. Applied by system preference. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-bg: #10150f;
+    --c-bg-tint: #151b14;
+    --c-surface: #1a211a;
+    --c-surface-2: #202820;
+    --c-surface-3: #273127;
+
+    --c-text: #eef2ec;
+    --c-text-muted: #a9b5a5;
+    --c-text-subtle: #7d8a79;
+
+    --c-border: #2c362c;
+    --c-border-strong: #3b4739;
+
+    --c-primary: #3fbb9a;
+    --c-primary-hover: #52cbaa;
+    --c-primary-active: #62d6b7;
+    --c-primary-soft: #17322b;
+    --c-primary-ring: rgba(63, 187, 154, 0.4);
+
+    --c-accent: #e0a44e;
+    --c-accent-soft: #33260f;
+    --c-warn: #d99a3f;
+    --c-warn-soft: #2f2410;
+    --c-danger: #e5806a;
+    --c-danger-soft: #331a15;
+    --c-info: #6fa8cc;
+    --c-info-soft: #16242e;
+
+    --sh-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --sh-2: 0 2px 8px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --sh-3: 0 12px 32px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35);
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "frontend",
+      "port": 5183,
+      "url": "http://localhost:5183"
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "backend/.venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8010"],
+      "cwd": "backend",
+      "port": 8010,
+      "url": "http://127.0.0.1:8010"
+    },
+    {
+      "name": "sandbox",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "frontend",
+      "env": { "BACKEND_PORT": "8011", "FRONTEND_PORT": "5184" },
+      "port": 5184,
+      "url": "http://localhost:5184"
+    }
+  ]
+}

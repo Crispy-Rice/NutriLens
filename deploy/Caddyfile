@@ -1,0 +1,49 @@
+# NutriLens 部署配置（Caddy）
+# 用法：复制到 /etc/caddy/Caddyfile，然后 `sudo systemctl reload caddy`
+#
+# 仅用公网 IP 访问（HTTP）：保留下面的 :80 块即可。
+# 有域名且想自动 HTTPS（Let's Encrypt 自动申请+续期）：把 ":80" 改成你的域名，
+# 例如  yourdomain.com { ... }，并确保控制台防火墙已放通 443。
+
+:80 {
+    # ---- 后端 API（FastAPI），含 SSE 流式（识别进度、对话逐字）----
+    # Caddy 默认即流式转发，无需额外配置
+    handle /api/* {
+        reverse_proxy 127.0.0.1:8010
+    }
+    handle /docs {
+        reverse_proxy 127.0.0.1:8010
+    }
+    handle /openapi.json {
+        reverse_proxy 127.0.0.1:8010
+    }
+
+    # ---- 前端静态文件（Vue 单页应用）----
+    # 用无路径 handle 作为 fallback，避免与上面的 /api 等 handle 互相干扰
+    handle {
+        root * /home/ubuntu/nutrilens/frontend/dist
+        encode gzip
+        # SPA 路由回退：刷新子页面（/chat、/history…）不会 404
+        try_files {path} /index.html
+        file_server
+    }
+}
+
+# ===== 域名 + 自动 HTTPS 写法（需要时替换上面的 :80 块）=====
+# yourdomain.com {
+#     handle /api/* {
+#         reverse_proxy 127.0.0.1:8010
+#     }
+#     handle /docs {
+#         reverse_proxy 127.0.0.1:8010
+#     }
+#     handle /openapi.json {
+#         reverse_proxy 127.0.0.1:8010
+#     }
+#     handle {
+#         root * /home/ubuntu/nutrilens/frontend/dist
+#         encode gzip
+#         try_files {path} /index.html
+#         file_server
+#     }
+# }
