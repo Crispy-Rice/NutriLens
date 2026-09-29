@@ -204,4 +204,20 @@ function onBlur(): void {
 .tag__hint {
   margin: 0;
 }
+
+@media (max-width: 640px) {
+  /* These are real tap targets, not decoration: at 25px they are well under
+     the comfortable minimum for a thumb. */
+  .tag__suggest-btn {
+    min-height: 36px;
+    padding: 0 var(--s-3);
+    font-size: var(--fs-sm);
+  }
+
+  .tag__x {
+    /* Give the remove affordance a decent hit area too. */
+    padding: 0 var(--s-2);
+    min-height: 28px;
+  }
+}
 </style>

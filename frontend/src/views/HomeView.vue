@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import ImagePicker from '@/components/ImagePicker.vue'
 import ModeSelector from '@/components/ModeSelector.vue'
-import MarkdownBlock from '@/components/MarkdownBlock.vue'
+import AnalysisProgress from '@/components/AnalysisProgress.vue'
 import ResultCard from '@/components/ResultCard.vue'
 import ProfileSummary from '@/components/ProfileSummary.vue'
 import { useAppStore } from '@/stores/app'
@@ -96,23 +96,17 @@ function onClear(): void {
         </div>
 
         <div class="actions">
+          <!-- Status and cancel live in the progress card below, so this row
+               only needs the trigger. It stays disabled rather than vanishing,
+               so the layout does not shift when analysing starts. -->
           <button
-            v-if="!analysis.isAnalyzing"
             class="btn btn--primary btn--lg"
             type="button"
             :disabled="!analysis.canAnalyze"
             @click="analysis.analyze()"
           >
-            开始分析
+            {{ analysis.isAnalyzing ? '分析中…' : '开始分析' }}
           </button>
-          <template v-else>
-            <button class="btn btn--lg" type="button" @click="analysis.cancel()">
-              取消分析
-            </button>
-            <p class="actions__status muted" role="status">
-              {{ analysis.statusMessage || '正在分析…' }}
-            </p>
-          </template>
         </div>
       </section>
 
@@ -126,14 +120,22 @@ function onClear(): void {
         <button class="btn btn--ghost" type="button" @click="analysis.analyze()">重试</button>
       </section>
 
-      <!-- Live advice while the model is still writing. Replaced by the full
-           result card once the stream completes. -->
-      <section v-if="analysis.isAnalyzing && analysis.streamedText" class="card">
-        <h2 class="card__title">正在生成建议</h2>
-        <MarkdownBlock :content="analysis.streamedText" streaming :collapsible="false" />
-      </section>
+      <!-- Same layout as the finished card, with placeholders — so when the
+           result arrives nothing moves. -->
+      <AnalysisProgress
+        v-if="analysis.isAnalyzing"
+        :dish-name="analysis.streamedDishName"
+        :advice="analysis.streamedText"
+        :status-message="analysis.statusMessage"
+        @cancel="analysis.cancel()"
+      />
 
-      <ResultCard v-if="analysis.result" :result="analysis.result" @restart="onClear" />
+      <ResultCard
+        v-if="analysis.result"
+        :result="analysis.result"
+        @restart="onClear"
+        @updated="analysis.setResult"
+      />
     </template>
   </div>
 </template>
@@ -211,10 +213,6 @@ function onClear(): void {
   margin-top: var(--s-5);
 }
 
-.actions__status {
-  font-size: var(--fs-sm);
-}
-
 .alert-card {
   border-color: color-mix(in srgb, var(--c-danger) 35%, transparent);
 }
@@ -227,10 +225,6 @@ function onClear(): void {
   .actions {
     flex-direction: column;
     align-items: stretch;
-  }
-
-  .actions__status {
-    text-align: center;
   }
 }
 </style>

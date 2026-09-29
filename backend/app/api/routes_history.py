@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import NotFoundError
 from app.db.repository import AnalysisRepository
 from app.db.session import get_db
-from app.schemas import AnalysisResult, HistoryPage
+from app.schemas import AnalysisEditRequest, AnalysisResult, HistoryPage
 
 router = APIRouter(tags=["history"])
 
@@ -38,6 +38,23 @@ def get_history_item(
     if result is None:
         raise NotFoundError("未找到这条分析记录。", hint="它可能已被删除。")
     return result
+
+
+@router.patch("/history/{analysis_id}", response_model=AnalysisResult)
+def update_history_item(
+    analysis_id: str,
+    patch: AnalysisEditRequest,
+    repo: AnalysisRepository = Depends(_repo),
+) -> AnalysisResult:
+    """Apply a user's correction to a stored recognition.
+
+    Only the fields a user can meaningfully judge are editable. The nutrition
+    figures are left as estimated — see AnalysisEditRequest for why.
+    """
+    updated = repo.update(analysis_id, patch)
+    if updated is None:
+        raise NotFoundError("未找到这条分析记录。", hint="它可能已被删除。")
+    return updated
 
 
 @router.delete("/history/{analysis_id}", status_code=204)

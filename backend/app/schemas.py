@@ -261,6 +261,8 @@ class AnalysisSummary(BaseModel):
     dish_name: str
     confidence: float
     calories_kcal: float | None = None
+    #: Surfaced in the list so a corrected row is distinguishable at a glance.
+    edited: bool = False
 
 
 class HistoryPage(BaseModel):

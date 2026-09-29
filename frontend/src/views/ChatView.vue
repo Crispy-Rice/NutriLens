@@ -129,7 +129,10 @@ onMounted(async () => {
         <span class="msg__avatar" aria-hidden="true">鉴</span>
         <div class="msg__body">
           <p class="thread__status subtle" role="status">
-            {{ conv.statusMessage || '正在处理…' }}
+            <template v-if="conv.streamedDishName">
+              正在识别：{{ conv.streamedDishName }}
+            </template>
+            <template v-else>{{ conv.statusMessage || '正在处理…' }}</template>
           </p>
           <div v-if="conv.streamedText" class="msg__prose">
             <MarkdownBlock :content="conv.streamedText" streaming :collapsible="false" />

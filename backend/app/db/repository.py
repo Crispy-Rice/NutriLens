@@ -21,6 +21,7 @@ from app.db.models import (
     ConversationMessage as ConversationMessageRecord,
 )
 from app.schemas import (
+    AnalysisEditRequest,
     AnalysisResult,
     AnalysisSummary,
     Conversation,
@@ -75,10 +76,15 @@ class AnalysisRepository:
 
         items: list[AnalysisSummary] = []
         for row in rows:
+            # Read from the payload rather than adding columns: there is no
+            # migration tooling here, and create_all() would not alter an
+            # existing table.
             calories = None
+            edited = False
             try:
                 payload = json.loads(row.payload)
                 calories = (payload.get("nutrition") or {}).get("calories_kcal")
+                edited = bool(payload.get("edited"))
             except Exception:
                 pass
             items.append(
@@ -89,6 +95,7 @@ class AnalysisRepository:
                     dish_name=row.dish_name,
                     confidence=row.confidence,
                     calories_kcal=calories,
+                    edited=edited,
                 )
             )
 
@@ -101,6 +108,42 @@ class AnalysisRepository:
         self.db.delete(record)
         self.db.commit()
         return True
+
+    def update(
+        self, analysis_id: str, patch: AnalysisEditRequest
+    ) -> AnalysisResult | None:
+        """Apply a user's correction to a stored result.
+
+        Rewrites the stored snapshot only — no model call is involved, and the
+        nutrition figures stay as the model estimated them (the edit form says
+        so). `edited` is set so every surface can label the values as corrected
+        rather than silently presenting them as model output.
+        """
+        record = self.db.get(AnalysisRecord, analysis_id)
+        if record is None:
+            return None
+
+        try:
+            current = AnalysisResult.model_validate(json.loads(record.payload))
+        except Exception:
+            logger.exception("记录 %s 的 payload 无法解析，拒绝编辑", analysis_id)
+            return None
+
+        updated = current.model_copy(
+            update={
+                "dish_name": patch.dish_name,
+                "ingredients": patch.ingredients,
+                "portion_estimate": patch.portion_estimate,
+                "edited": True,
+            }
+        )
+
+        record.payload = updated.model_dump_json()
+        # dish_name is denormalised into a column the history list reads, so it
+        # has to move with the payload.
+        record.dish_name = updated.dish_name
+        self.db.commit()
+        return updated
 
     def delete_all(self) -> int:
         deleted = self.db.query(AnalysisRecord).delete()

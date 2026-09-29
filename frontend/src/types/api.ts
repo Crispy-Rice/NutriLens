@@ -100,6 +100,8 @@ export interface AnalysisSummary {
   dish_name: string
   confidence: number
   calories_kcal: number | null
+  /** True when the user corrected this record by hand. */
+  edited: boolean
 }
 
 export interface HistoryPage {

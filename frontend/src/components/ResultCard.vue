@@ -3,15 +3,26 @@ import { computed, ref } from 'vue'
 import type { AnalysisResult, ProcessedImage } from '@/types/api'
 import ConfidenceBadge from '@/components/ConfidenceBadge.vue'
 import AnalysisSections, { type AnalysisDisplay } from '@/components/AnalysisSections.vue'
+import EditAnalysisForm from '@/components/EditAnalysisForm.vue'
 import { useAppStore } from '@/stores/app'
 import { useResultExport } from '@/composables/useResultExport'
 import { formatDateTime } from '@/utils/format'
 
 const props = defineProps<{ result: AnalysisResult }>()
-const emit = defineEmits<{ (e: 'restart'): void }>()
+const emit = defineEmits<{
+  (e: 'restart'): void
+  /** The stored record changed, so the owner should adopt the new value. */
+  (e: 'updated', result: AnalysisResult): void
+}>()
 
 const app = useAppStore()
 const cardRef = ref<HTMLElement | null>(null)
+const editing = ref(false)
+
+function onSaved(updated: AnalysisResult): void {
+  editing.value = false
+  emit('updated', updated)
+}
 
 const { savingPng, notice, savePng, saveJson, saveText, copyText } = useResultExport(
   () => props.result,
@@ -62,7 +73,14 @@ const imageOps = computed(() => {
 
 <template>
   <div class="wrap">
-    <article ref="cardRef" class="result card">
+    <EditAnalysisForm
+      v-if="editing"
+      :result="props.result"
+      @saved="onSaved"
+      @cancel="editing = false"
+    />
+
+    <article v-else ref="cardRef" class="result card">
       <header class="result__head">
         <div class="result__title">
           <h2 class="result__dish">{{ props.result.dish_name }}</h2>
@@ -78,6 +96,12 @@ const imageOps = computed(() => {
         <!-- Makes the profile's influence visible rather than silent. -->
         <p v-if="props.result.profile_used" class="badge badge--primary result__profile">
           已参考你的饮食画像
+        </p>
+
+        <!-- Without this the corrected values would sit under an "AI estimate"
+             disclaimer as if the model had produced them. -->
+        <p v-if="props.result.edited" class="badge badge--accent result__profile">
+          已人工修正
         </p>
 
         <div v-if="props.result.dish_name_alternatives.length > 0" class="result__alts">
@@ -117,19 +141,26 @@ const imageOps = computed(() => {
 
     <!-- Toolbar lives outside the captured node so the exported PNG doesn't
          contain buttons. -->
-    <div class="toolbar">
+    <div v-if="!editing" class="toolbar">
+      <!-- Split so that on a phone the two actions people actually reach for
+           can stay pinned to the bottom while the card scrolls past. -->
       <div class="toolbar__group">
         <button class="btn btn--ghost" type="button" :disabled="savingPng" @click="savePng">
           {{ savingPng ? '正在生成…' : '保存为图片' }}
         </button>
-        <button class="btn btn--ghost" type="button" @click="saveJson">保存 JSON</button>
-        <button class="btn btn--ghost" type="button" @click="saveText">保存文本</button>
+        <button class="btn btn--ghost" type="button" @click="saveJson">JSON</button>
+        <button class="btn btn--ghost" type="button" @click="saveText">文本</button>
         <button class="btn btn--ghost" type="button" @click="copyText">复制</button>
       </div>
 
-      <button class="btn btn--primary" type="button" @click="emit('restart')">
-        再识别一张
-      </button>
+      <div class="toolbar__primary">
+        <button class="btn btn--ghost" type="button" @click="editing = true">
+          修正识别
+        </button>
+        <button class="btn btn--primary" type="button" @click="emit('restart')">
+          再识别一张
+        </button>
+      </div>
     </div>
 
     <p v-if="notice" class="toast" role="status">{{ notice }}</p>
@@ -214,6 +245,11 @@ const imageOps = computed(() => {
   flex-wrap: wrap;
 }
 
+.toolbar__primary {
+  display: flex;
+  gap: var(--s-2);
+}
+
 .toast {
   align-self: center;
   padding: var(--s-2) var(--s-4);
@@ -225,13 +261,29 @@ const imageOps = computed(() => {
 
 @media (max-width: 560px) {
   .toolbar {
-    flex-direction: column-reverse;
+    flex-direction: column;
     align-items: stretch;
+    gap: var(--s-2);
   }
 
   .toolbar__group {
     display: grid;
     grid-template-columns: 1fr 1fr;
+  }
+
+  /* Pinned to the bottom of the viewport for as long as the card is on screen,
+     with room for the home indicator beneath it. */
+  .toolbar__primary {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s-2);
+    padding: var(--s-3) 0 calc(var(--s-3) + env(safe-area-inset-bottom, 0px));
+    background: color-mix(in srgb, var(--c-bg) 94%, transparent);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--c-border);
   }
 
   .result__dish {

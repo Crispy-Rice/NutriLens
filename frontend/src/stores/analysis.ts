@@ -83,6 +83,11 @@ export const useAnalysisStore = defineStore('analysis', () => {
     mode.value = next
   }
 
+  /** Adopt a result the user corrected by hand. */
+  function setResult(next: AnalysisResult): void {
+    result.value = next
+  }
+
   async function analyze(): Promise<void> {
     if (selection.images.value.length === 0) return
 
@@ -159,6 +164,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     clear,
     clearResult,
     setMode,
+    setResult,
     analyze,
     cancel,
   }

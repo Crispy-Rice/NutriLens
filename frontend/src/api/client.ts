@@ -1,12 +1,14 @@
 import axios, { AxiosError } from 'axios'
 import type {
   AnalysisMode,
+  AnalysisResult,
   Conversation,
   ConversationPage,
   ConversationSummary,
   ErrorResponse,
   HealthResponse,
   HistoryPage,
+  Ingredient,
   PublicConfig,
 } from '@/types/api'
 
@@ -129,6 +131,34 @@ export async function fetchHistory(limit = 20, offset = 0): Promise<HistoryPage>
 export async function deleteAnalysis(id: string): Promise<void> {
   try {
     await http.delete(`/history/${id}`)
+  } catch (err) {
+    throw toApiError(err)
+  }
+}
+
+export async function fetchAnalysis(id: string): Promise<AnalysisResult> {
+  try {
+    const { data } = await http.get<AnalysisResult>(`/history/${id}`)
+    return data
+  } catch (err) {
+    throw toApiError(err)
+  }
+}
+
+/** The fields a user may correct by hand. */
+export interface AnalysisEditPatch {
+  dish_name: string
+  ingredients: Ingredient[]
+  portion_estimate: string | null
+}
+
+export async function updateAnalysis(
+  id: string,
+  patch: AnalysisEditPatch,
+): Promise<AnalysisResult> {
+  try {
+    const { data } = await http.patch<AnalysisResult>(`/history/${id}`, patch)
+    return data
   } catch (err) {
     throw toApiError(err)
   }

@@ -22,6 +22,12 @@ const router = createRouter({
       meta: { title: '历史记录' },
     },
     {
+      path: '/history/:id',
+      name: 'history-detail',
+      component: () => import('@/views/HistoryDetailView.vue'),
+      meta: { title: '记录详情' },
+    },
+    {
       path: '/profile',
       name: 'profile',
       component: () => import('@/views/ProfileView.vue'),

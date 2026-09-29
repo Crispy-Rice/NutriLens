@@ -88,22 +88,28 @@ onMounted(load)
 
     <ul v-else class="list">
       <li v-for="item in items" :key="item.id" class="row-item">
-        <div class="row-item__main">
-          <p class="row-item__dish">{{ item.dish_name }}</p>
-          <p class="row-item__meta subtle">
-            {{ formatDateTime(item.created_at) }} ·
-            {{ item.mode === 'detailed' ? '详细分析' : '快速识别' }}
-          </p>
-        </div>
+        <!-- The whole row opens the detail page. Delete sits outside the link,
+             because a button nested in an anchor is invalid and would swallow
+             the tap. -->
+        <RouterLink class="row-item__link" :to="{ name: 'history-detail', params: { id: item.id } }">
+          <div class="row-item__main">
+            <p class="row-item__dish">{{ item.dish_name }}</p>
+            <p class="row-item__meta subtle">
+              {{ formatDateTime(item.created_at) }} ·
+              {{ item.mode === 'detailed' ? '详细分析' : '快速识别' }}
+            </p>
+          </div>
 
-        <div class="row-item__stats">
-          <span class="badge" :class="`badge--${confidenceBand(item.confidence, app.config?.low_confidence_threshold).tone}`">
-            {{ confidenceBand(item.confidence, app.config?.low_confidence_threshold).label }}
-          </span>
-          <span class="row-item__kcal mono">
-            {{ formatNutrient(item.calories_kcal, ' kcal') }}
-          </span>
-        </div>
+          <div class="row-item__stats">
+            <span v-if="item.edited" class="badge badge--accent">已修正</span>
+            <span class="badge" :class="`badge--${confidenceBand(item.confidence, app.config?.low_confidence_threshold).tone}`">
+              {{ confidenceBand(item.confidence, app.config?.low_confidence_threshold).label }}
+            </span>
+            <span class="row-item__kcal mono">
+              {{ formatNutrient(item.calories_kcal, ' kcal') }}
+            </span>
+          </div>
+        </RouterLink>
 
         <button
           class="btn btn--ghost row-item__del"
@@ -150,6 +156,23 @@ onMounted(load)
   border: 1px solid var(--c-border);
   border-radius: var(--r-md);
   box-shadow: var(--sh-1);
+}
+
+.row-item__link {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  flex: 1;
+  min-width: 0;
+  /* The link is the tap target, so it needs the full min height on mobile. */
+  min-height: var(--tap-min);
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--r-sm);
+}
+
+.row-item__link:hover .row-item__dish {
+  color: var(--c-primary);
 }
 
 .row-item__main {

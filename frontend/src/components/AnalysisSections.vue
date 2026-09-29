@@ -25,7 +25,7 @@ export interface AnalysisDisplay {
   additionalDishes: DishAnalysis[]
 }
 
-const props = withDefaults(
+withDefaults(
   defineProps<{
     display: AnalysisDisplay
     /** Draw skeleton placeholders for sections with no content yet. */
@@ -43,7 +43,26 @@ const SKELETON_WIDTHS = ['92%', '78%', '86%']
 
 <template>
   <div class="sections">
-    <!-- 1. overall -->
+    <!-- 1. advice — first on purpose.
+         It is the only section that streams, so nothing may sit above it: any
+         section that grows when the result lands would push down the text the
+         user is mid-sentence on. Leading with it also keeps it above the fold
+         while it is still being written. It is written not to restate the
+         numbers further down, so reading it before them is fine. -->
+    <section v-if="display.advice" class="block">
+      <h3 class="label">饮食建议</h3>
+      <MarkdownBlock
+        :content="display.advice"
+        :streaming="streamingAdvice"
+        :collapsible="adviceCollapsible && !streamingAdvice"
+      />
+    </section>
+    <section v-else-if="pending" class="block">
+      <h3 class="label">饮食建议</h3>
+      <div class="skeleton"><span style="width: 88%"></span></div>
+    </section>
+
+    <!-- 2. overall -->
     <section v-if="display.overall" class="block">
       <OverallPanel :overall="display.overall" />
     </section>
@@ -54,7 +73,7 @@ const SKELETON_WIDTHS = ['92%', '78%', '86%']
       </div>
     </section>
 
-    <!-- 2. ingredients -->
+    <!-- 3. ingredients -->
     <section v-if="display.ingredients.length > 0" class="block">
       <h3 class="label">主要食材</h3>
       <ul class="ing">
@@ -74,7 +93,7 @@ const SKELETON_WIDTHS = ['92%', '78%', '86%']
       </div>
     </section>
 
-    <!-- 3. portion -->
+    <!-- 4. portion -->
     <section v-if="display.portionEstimate" class="block">
       <h3 class="label">估算份量</h3>
       <p>{{ display.portionEstimate }}</p>
@@ -84,7 +103,7 @@ const SKELETON_WIDTHS = ['92%', '78%', '86%']
       <div class="skeleton"><span style="width: 45%"></span></div>
     </section>
 
-    <!-- 4. nutrition -->
+    <!-- 5. nutrition -->
     <section v-if="display.nutrition" class="block">
       <h3 class="label">营养估算</h3>
       <NutritionTable :nutrition="display.nutrition" />
@@ -94,20 +113,6 @@ const SKELETON_WIDTHS = ['92%', '78%', '86%']
       <div class="skeleton">
         <span v-for="w in ['70%', '62%', '66%', '58%']" :key="w" :style="{ width: w }"></span>
       </div>
-    </section>
-
-    <!-- 5. advice — the section that actually streams -->
-    <section v-if="display.advice" class="block">
-      <h3 class="label">饮食建议</h3>
-      <MarkdownBlock
-        :content="display.advice"
-        :streaming="streamingAdvice"
-        :collapsible="adviceCollapsible && !streamingAdvice"
-      />
-    </section>
-    <section v-else-if="pending" class="block">
-      <h3 class="label">饮食建议</h3>
-      <div class="skeleton"><span style="width: 88%"></span></div>
     </section>
 
     <!-- 6. risk notes -->

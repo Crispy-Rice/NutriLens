@@ -299,3 +299,30 @@ a {
   background: var(--c-info-soft);
   color: var(--c-info);
 }
+
+/* ---------- small screens ---------- */
+
+/*
+ * iOS Safari zooms the whole page in when a control whose font-size is below
+ * 16px receives focus, and it does not zoom back out. Raising form controls to
+ * 16px on small screens is the reliable fix; `user-scalable=no` would kill
+ * pinch-zoom for everyone, which is worse.
+ */
+@media (max-width: 640px) {
+  .input,
+  .textarea,
+  input[type='text'],
+  input[type='search'],
+  input[type='email'],
+  input[type='url'],
+  input[type='number'],
+  textarea,
+  select {
+    font-size: 1rem;
+  }
+}
+
+/* Room for the home indicator on notched phones. */
+.safe-bottom {
+  padding-bottom: calc(var(--s-4) + env(safe-area-inset-bottom, 0px));
+}

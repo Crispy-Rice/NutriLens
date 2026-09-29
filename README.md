@@ -44,7 +44,7 @@ npm run dev
 ### 跑测试
 
 ```bash
-cd backend && ./.venv/Scripts/python.exe -m pytest      # 157 个测试
+cd backend && ./.venv/Scripts/python.exe -m pytest      # 201 个测试
 cd frontend && npm run type-check                        # vue-tsc
 ```
 
@@ -108,6 +108,7 @@ cd frontend && npm run type-check                        # vue-tsc
 | POST | `/api/analyze/stream` | 同上入参 → SSE 流 |
 | GET | `/api/history?limit=&offset=` | 单次分析历史 |
 | GET / DELETE | `/api/history/{id}` | 单条详情 / 删除 |
+| PATCH | `/api/history/{id}` | 人工修正菜名、食材与份量 |
 | POST | `/api/conversations` | `{mode}` → 建一个空会话，立即返回 id |
 | POST | `/api/conversations/{id}/turns/stream` | `multipart(files[]?, message, profile?)` → SSE 流 |
 | GET | `/api/conversations?limit=&offset=` | 会话列表 |
@@ -131,11 +132,13 @@ cd frontend && npm run type-check                        # vue-tsc
 | 事件 | 载荷 | 说明 |
 |---|---|---|
 | `status` | `{stage, message}` | 阶段：`calling_model` → `parsing` |
-| `partial` | `{text}` | **增量文本**，只含 `advice` 字段内容 |
+| `partial` | `{field, text}` | **增量文本**，`field` 取值 `dish_name` / `advice` / `reply` |
 | `result` | 完整 `AnalysisResult` | 结束时一次性下发 |
 | `error` | `{code, message, hint}` | 流中途出错时下发 |
 
-设计要点：**流式阶段只推 `advice` 文本，不推原始 JSON**。后端在模型输出累积过程中做增量字段提取（`parser.extract_partial_advice`），把 `"advice": "..."` 的内容边生成边解码（含 `\n`、`\"`、`\uXXXX` 转义，跨 chunk 的半截转义会暂缓输出）。否则用户会看到一屏滚动的 JSON。
+设计要点：**流式阶段只推字段文本，不推原始 JSON**。后端在模型输出累积过程中做增量字段提取（`parser.extract_partial_string` + `PartialFieldEmitter`），把 `"advice": "..."` 的内容边生成边解码（含 `\n`、`\"`、`\uXXXX` 转义，跨 chunk 的半截转义会暂缓输出）。否则用户会看到一屏滚动的 JSON。
+
+**`dish_name` 也一起推**：模型按字段顺序输出，菜名远在 JSON 闭合之前就写好了，所以分析进行中的卡片能直接显示真实菜名，而不是空骨架。
 
 前端**没有用 `EventSource`**：它只能发 GET 且不能带请求体，而这两个接口都需要 POST 一张图片。所以改用 `fetch` + `ReadableStream` 手写 SSE 帧解析（`src/api/stream.ts`）。
 
@@ -199,6 +202,7 @@ cd frontend && npm run type-check                        # vue-tsc
 | **数值必须带口径** | `nutrition.basis` 必填，说明数值对应的份量。缺少口径的营养数字会被读成比实际更权威 |
 | **不知道就留空** | 所有营养字段可为 `null`。提示词明确要求「判断不了填 null，不要编造，也不要用 0 表示不知道」——0 是一个具体主张，`null` 才是「未知」 |
 | **输出可控** | 模型输出经括号配平抽取 → 尾逗号修复 → 中文引号修复 → Pydantic 校验。全失败时**降级**为纯文本展示并置 `degraded=true`，而不是返回 500；前端会明确说明「本次没有返回标准结构」 |
+| **整体构成不打分** | 「这一餐的整体构成」按维度描述（蔬菜／蛋白质／主食／烹调方式／口味），每维只有一句事实描述和一个数量词（偏少/适中/偏多）。schema 里没有评分、等级、排名字段；提示词明文禁止评分、等级、星级与「健康/不健康/好/差」这类好坏词，并禁止由「偏少」引向说教（「你应该多吃蔬菜」）。**UI 也必须保持中性**：所有档位标签用同一套灰色样式，绝不按值染绿/染红——`tests/test_overall.py` 与浏览器实测各有一条守住这点 |
 | **画像不越界** | 画像字段刻意**不含身高、体重、BMI 与疾病诊断**——结构化身体数据会直接引出「算 BMI、评判体型、推断病情」这类结论。唯一自由文本入口 `health_notes` 由提示词约束为「只作食材筛选」，并明文禁止计算 BMI/体重/体脂/基础代谢、禁止评价体型、禁止把自述当诊断、禁止在回复里复述用户健康信息。`tests/test_profile.py` 逐条守住这些规则 |
 
 置信度做了尺度归一：模型可能返回 `0.87`、`87` 或 `"87%"`，都会落到 0–1。超出范围的异常值**向低置信度一侧收敛**——宁可让用户多确认一次，也不要虚报把握。
@@ -209,7 +213,8 @@ cd frontend && npm run type-check                        # vue-tsc
 
 顺序是刻意的（`app/services/image_service.py`）：
 
-1. **流式读取并计数**，超过上限立即中断——不会先把 100MB 读进内存再检查。
+1. **逐块读取并计数**，超过上限立即中断。
+   但要讲清楚这道闸门的位置：Starlette 的 multipart 解析器在进入处理函数之前**已经把整个请求体收完了**（超过约 1MB 会落到系统临时文件）——本项目用 `UploadFile.size` 预检总量，本身就说明 body 已完整解析。所以这里拦的是「解析之后把大文件读进内存」，**不是**「拒绝接收大 body」。真正的第一道防线应放在反向代理的 body 上限，或一个查 `Content-Length` 的 ASGI 中间件。
 2. **真实解码**（Pillow）判断格式与完整性。改后缀的假图片走的是内容判断，不看扩展名或 Content-Type。
 3. **像素数上限**，从文件头判断，不会为炸弹分配像素缓冲。
 4. **EXIF 方向校正**，手机竖拍照片不会躺着。
@@ -253,15 +258,22 @@ frontend/src/
 ├─ stores/              # app / analysis / conversation / profile
 ├─ composables/         # useImageCompress / useImageSelection / useResultExport
 ├─ utils/               # format / exportCard
-├─ components/          # ImagePicker / AnalysisPanel / ChatMessage / ResultCard / …
-└─ views/               # Home（识别）/ Chat（对话）/ History / Profile / About
+├─ components/          # ImagePicker / AnalysisSections / AnalysisProgress / ResultCard /
+│                       # EditAnalysisForm / OverallPanel / ConfirmDialog / ChatMessage / …
+└─ views/               # Home（识别）/ Chat（对话）/ History / HistoryDetail / Profile / About
 ```
 
 ---
 
 ## 9. 结果卡与本地保存
 
-结果卡展示：菜品名与候选名、置信度分档、主要食材及估算用量、估算份量、营养估算表（含口径）、饮食建议（Markdown）、风险提示、不确定项、图片处理说明、免责声明。
+结果卡展示：菜品名与候选名、置信度分档、饮食建议（Markdown）、整体构成、主要食材及估算用量、估算份量、营养估算表（含口径）、风险提示、不确定项、图片处理说明、免责声明。
+
+**分区顺序把「饮食建议」放在最前面**，这不是排版偏好，而是流式体验的要求：建议是唯一逐字推送的分区，它上面**不能有任何一个会随后长高的分区**，否则结果落地时正在读的那段文字会被推走。实测把建议放在第五节时内容会下移 903px，移到第一节后只剩 46px（那 46px 是置信度占位块与真实块的差）。分析进行中的那张卡与最终结果卡**共用同一个分区组件**（`AnalysisSections.vue`），顺序只定义一次，所以两者不会漂移。
+
+**手动修正**：模型认错时可以改菜名、增删改食材、改份量，覆盖原记录。**营养数值不开放编辑**——它们由食材推导而来，允许独立编辑会让一张卡片自相矛盾；表单里明确写着「营养数值仍是模型按原始识别估算的，修改食材不会自动重算」。修正过的记录在结果卡、历史列表和导出文本里都标「已人工修正」，否则被改过的数字会顶着「AI 估算」的免责声明冒充模型输出。
+
+**历史详情**：历史列表整行可点，进入 `/history/{id}` 看完整结果卡（可编辑、可导出、可删除）。用独立路由而不是弹层——内容很长，路由天然带滚动、刷新与后退，手机上也更好用。
 
 保存到本地三种格式，全部在浏览器内完成、不经过服务端：
 
@@ -383,7 +395,7 @@ curl -s -D - -o /dev/null -X POST http://127.0.0.1:8010/api/analyze \
 
 **已实测**（后端用 curl 打真实接口，前端在浏览器中实际操作）：
 
-- 后端 157 个 pytest 全绿；前端 `vue-tsc` 与 `vite build` 无错误。
+- 后端 201 个 pytest 全绿；前端 `vue-tsc` 与 `vite build` 无错误。
 - 完整链路：上传 → 压缩预览（2400×1600/122KB → 1600×1067/38KB，省 69%）→ 选模式 → 流式分析 → 结果卡 → 三种格式导出。
 - SSE：`status` → 6 个 `partial` → `status` → `result`，且增量文本拼起来与最终 `advice` 完全一致。
 - 错误路径逐一实测并确认状态码：损坏文件 400、文本改名 400、BMP 415、12MB 文件 413、非法 mode 400、缺文件 422。
@@ -422,6 +434,17 @@ curl -s -D - -o /dev/null -X POST http://127.0.0.1:8010/api/analyze \
 - 追问回复里模型主动声明「看不到你之前上传的照片」，与提示词要求一致。
 - 中文表单字段往返无损（用显式 UTF-8 客户端验证）。
 
+**整体构成 · 手动修正 · 历史详情 · 流式衔接**（浏览器实测 + 程序化断言）
+
+- **档位标签没有任何好坏配色**：程序化读取三个档位的 `backgroundColor` / `color`，三者完全相同 —— 靠数值比对而不是肉眼确认「偏少没有被标红」。
+- 分维度描述按维度渲染，没有数量概念的维度（烹调方式、口味）不显示档位标签。
+- **流式不再跳位**：实测「饮食建议」在分析中与结果落地后的偏移只差 **46px**（把建议放到第五节时是 903px）；两次抓取的分区顺序完全一致；进度卡与结果卡共用同一套顺序定义。
+- 进度卡能显示**真实菜名**（来自 `dish_name` 的增量提取）、13 条骨架占位、与结果卡同序的 7 个分区标题。
+- 手动修正：改菜名 + 食材 + 份量后保存 → 卡片就地更新并出现「已人工修正」→ 刷新后仍在 → 历史列表显示新菜名（说明反规范化的 `dish_name` 列同步了）与「已修正」标记；**营养数值保持原样**；空菜名被拒、空白食材行按「删除」处理。
+- 历史详情：整行可点（链接高 46px ≥ 触摸下限），删除按钮在链接之外（按钮嵌在 `<a>` 里既不合规也会吞掉点击）；直接访问 `/history/{id}` 能渲染，不存在的 id 给出可返回的错误页。
+- 手机端（375 与 360 两档）：五个页面均无横向溢出；**没有低于 16px 的表单控件**（iOS 聚焦缩放的那条）；360px 下 5 项导航不重叠不溢出；结果卡在手机上把「修正识别／再识别一张」做成底部粘性条，并带 `env(safe-area-inset-bottom)`。
+- 顺带修掉了画像建议词条 25px 的触控高度（提到 36px）。
+
 **未验证**：
 
 - **真实模型下的识别质量与多轮表现**。真实 provider 的耗时链路已用一次 qwen3.8-max 调用验证过，但**识别准确度**、**多轮追问的答案质量**、以及**画像是否真的改善了建议**都没有实测（本机只有 mock 可跑）。首次接真 Key 时建议先用「详细分析」跑几张图，再试一轮追问。
@@ -429,6 +452,10 @@ curl -s -D - -o /dev/null -X POST http://127.0.0.1:8010/api/analyze \
 - `stream_options.include_usage` 与 `enable_thinking` 两个扩展参数在**不支持它们的厂商**上的报错路径（代码里做了 400 映射与提示，但未逐一实测）。
 - 连接复用、prompt caching、两段式返回三项优化**尚未实现**，见 §10。
 - 多图 prefill 成本只有估算（测试图是纯色块，token 数不具代表性），真实数字需看实际 `prompt_tokens`。
+- **真实模型下的「整体构成」措辞没有实测**。提示词点名禁止了评分、等级与「健康/不健康/好/差」这类词，`tests/test_overall.py` 也逐条守住，但**模型是否真的会越界说教，只有接真 Key 才能确认**。第一次用时建议专门看这一节有没有出现「应该多吃」这类表述。
+- **对话里的分析轮不可编辑**。修正只覆盖历史记录（`PATCH /api/history/{id}`）；对话轮次在另一张表里。要支持的话把同一套 patch 扩到 message 上即可。
+- **改完食材不重算营养**，这是「只改菜名/食材/份量」这一选定范围的固有代价，表单里已写明。
+- **没有数据库迁移**：只有 `create_all`，它不会修改已存在的表。所以 `edited` 跟着结果 JSON 走、历史列表从 payload 里读，而不是新加一列——加列会让现有库静默不同步。真正的 schema 演进要先上 Alembic。
 - Safari / iOS 真机。`createImageBitmap(file, {imageOrientation})` 在旧版 Safari 上会抛错，代码里有 `<img>` 回退路径，但未在真机验证。
 - 高并发与长时压测。
 
