@@ -2,10 +2,7 @@
 import { computed, ref } from 'vue'
 import type { AnalysisResult, ProcessedImage } from '@/types/api'
 import ConfidenceBadge from '@/components/ConfidenceBadge.vue'
-import NutritionTable from '@/components/NutritionTable.vue'
-import MarkdownBlock from '@/components/MarkdownBlock.vue'
-import AdditionalDishes from '@/components/AdditionalDishes.vue'
-import OverallPanel from '@/components/OverallPanel.vue'
+import AnalysisSections, { type AnalysisDisplay } from '@/components/AnalysisSections.vue'
 import { useAppStore } from '@/stores/app'
 import { useResultExport } from '@/composables/useResultExport'
 import { formatDateTime } from '@/utils/format'
@@ -22,6 +19,19 @@ const { savingPng, notice, savePng, saveJson, saveText, copyText } = useResultEx
 )
 
 const confidenceThreshold = computed(() => app.config?.low_confidence_threshold ?? 0.55)
+
+// Feeds the shared body. The same shape is used, with nulls, while analysing —
+// which is what keeps the two states laid out identically.
+const display = computed<AnalysisDisplay>(() => ({
+  overall: props.result.overall,
+  ingredients: props.result.ingredients,
+  portionEstimate: props.result.portion_estimate,
+  nutrition: props.result.nutrition,
+  advice: props.result.advice,
+  riskNotes: props.result.risk_notes,
+  uncertaintyNotes: props.result.uncertainty_notes,
+  additionalDishes: props.result.additional_dishes,
+}))
 
 function describeOps(image: ProcessedImage): string {
   return image.operations.length > 0 ? image.operations.join(' · ') : '未做额外处理'
@@ -92,51 +102,7 @@ const imageOps = computed(() => {
         模型本次没有返回标准结构，以下内容已按纯文本兜底展示，部分字段可能缺失。
       </p>
 
-      <OverallPanel v-if="props.result.overall" :overall="props.result.overall" />
-
-      <section v-if="props.result.ingredients.length > 0" class="result__block">
-        <h3 class="result__label">主要食材</h3>
-        <ul class="ing">
-          <li v-for="item in props.result.ingredients" :key="item.name" class="ing__item">
-            <span class="ing__name">{{ item.name }}</span>
-            <span v-if="item.estimated_amount" class="ing__amount mono">
-              {{ item.estimated_amount }}
-            </span>
-            <span v-if="item.note" class="ing__note subtle">{{ item.note }}</span>
-          </li>
-        </ul>
-      </section>
-
-      <section v-if="props.result.portion_estimate" class="result__block">
-        <h3 class="result__label">估算份量</h3>
-        <p>{{ props.result.portion_estimate }}</p>
-      </section>
-
-      <section class="result__block">
-        <h3 class="result__label">营养估算</h3>
-        <NutritionTable :nutrition="props.result.nutrition" />
-      </section>
-
-      <section v-if="props.result.advice" class="result__block">
-        <h3 class="result__label">饮食建议</h3>
-        <MarkdownBlock :content="props.result.advice" collapsed-height="18rem" />
-      </section>
-
-      <section v-if="props.result.risk_notes.length > 0" class="result__block">
-        <h3 class="result__label">需要注意</h3>
-        <ul class="notes notes--risk">
-          <li v-for="note in props.result.risk_notes" :key="note">{{ note }}</li>
-        </ul>
-      </section>
-
-      <section v-if="props.result.uncertainty_notes.length > 0" class="result__block">
-        <h3 class="result__label">本次不确定的地方</h3>
-        <ul class="notes">
-          <li v-for="note in props.result.uncertainty_notes" :key="note">{{ note }}</li>
-        </ul>
-      </section>
-
-      <AdditionalDishes :dishes="props.result.additional_dishes" />
+      <AnalysisSections :display="display" />
 
       <footer class="result__foot">
         <div v-if="imageOps" class="result__ops subtle">
@@ -212,59 +178,6 @@ const imageOps = computed(() => {
   background: var(--c-warn-soft);
   color: var(--c-warn);
   font-size: var(--fs-sm);
-}
-
-.result__block {
-  padding-top: var(--s-4);
-  border-top: 1px solid var(--c-border);
-}
-
-.result__label {
-  font-size: var(--fs-sm);
-  font-weight: 650;
-  color: var(--c-text-subtle);
-  letter-spacing: 0.06em;
-  margin-bottom: var(--s-3);
-}
-
-.ing {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-2);
-}
-
-.ing__item {
-  display: flex;
-  align-items: baseline;
-  gap: var(--s-2);
-  flex-wrap: wrap;
-}
-
-.ing__name {
-  font-weight: 550;
-}
-
-.ing__amount {
-  font-size: var(--fs-sm);
-  color: var(--c-text-muted);
-}
-
-.ing__note {
-  flex-basis: 100%;
-}
-
-.notes {
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-1);
-  color: var(--c-text-muted);
-}
-
-.notes--risk {
-  color: var(--c-warn);
 }
 
 .result__foot {
