@@ -48,6 +48,23 @@ export interface DishAnalysis {
   uncertainty_notes: string[]
 }
 
+/**
+ * One dimension of the meal as a whole.
+ *
+ * `level` is a quantity word (偏少 / 适中 / 偏多), never a quality word, and
+ * must not be colour-coded — green/red styling would turn it into a grade.
+ */
+export interface MealAspect {
+  label: string
+  level: string | null
+  note: string
+}
+
+export interface MealOverall {
+  summary: string
+  aspects: MealAspect[]
+}
+
 export interface AnalysisResult {
   id: string
   created_at: string
@@ -59,6 +76,8 @@ export interface AnalysisResult {
   ingredients: Ingredient[]
   portion_estimate: string | null
   nutrition: Nutrition
+  /** Dimension-by-dimension view of the meal; null when not provided. */
+  overall: MealOverall | null
   /** Other dishes seen in the same photos; empty for a single-dish meal. */
   additional_dishes: DishAnalysis[]
   advice: string
@@ -70,6 +89,8 @@ export interface AnalysisResult {
   images: ProcessedImage[]
   /** True when a user profile informed this result. Contents are never stored. */
   profile_used: boolean
+  /** True once the user has corrected the recognition by hand. */
+  edited: boolean
 }
 
 export interface AnalysisSummary {
@@ -212,6 +233,10 @@ export interface StatusEvent {
   message: string
 }
 
+/** Which part of the reply a partial chunk belongs to. */
+export type PartialField = 'dish_name' | 'advice' | 'reply'
+
 export interface PartialEvent {
+  field: PartialField
   text: string
 }

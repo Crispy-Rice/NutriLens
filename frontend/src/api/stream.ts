@@ -14,20 +14,21 @@ import type {
   AnalysisResult,
   ConversationMessage,
   PartialEvent,
+  PartialField,
   StatusEvent,
 } from '@/types/api'
 
 export interface AnalysisStreamHandlers {
   signal?: AbortSignal
   onStatus?: (event: StatusEvent) => void
-  onPartial?: (text: string) => void
+  onPartial?: (field: PartialField, text: string) => void
   onResult?: (result: AnalysisResult) => void
 }
 
 export interface TurnStreamHandlers {
   signal?: AbortSignal
   onStatus?: (event: StatusEvent) => void
-  onPartial?: (text: string) => void
+  onPartial?: (field: PartialField, text: string) => void
   /** The stored assistant message for this turn. */
   onResult?: (message: ConversationMessage) => void
 }
@@ -190,7 +191,10 @@ async function postSse(
 
 /** Common status/partial/error handling shared by both stream types. */
 function baseDispatch(
-  handlers: { onStatus?: (e: StatusEvent) => void; onPartial?: (t: string) => void },
+  handlers: {
+    onStatus?: (e: StatusEvent) => void
+    onPartial?: (field: PartialField, text: string) => void
+  },
   onResultFrame: (data: string) => ApiError | null,
 ): (frame: Frame) => ApiError | null {
   return (frame) => {
@@ -204,7 +208,8 @@ function baseDispatch(
         return null
       case 'partial':
         try {
-          handlers.onPartial?.((JSON.parse(frame.data) as PartialEvent).text)
+          const payload = JSON.parse(frame.data) as PartialEvent
+          handlers.onPartial?.(payload.field ?? 'reply', payload.text)
         } catch {
           // Partial text is best-effort.
         }

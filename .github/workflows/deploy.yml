@@ -1,9 +1,9 @@
 name: Deploy to Tencent Cloud
 
-# 触发：推送（含 PR 合并）到 main 分支时立即自动部署
+# 触发：推送（含 PR 合并）到 master 分支时立即自动部署
 on:
   push:
-    branches: [main]
+    branches: [master]
   # 也可在 Actions 页面手动触发，方便调试
   workflow_dispatch:
 

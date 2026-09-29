@@ -5,6 +5,7 @@ import ConfidenceBadge from '@/components/ConfidenceBadge.vue'
 import NutritionTable from '@/components/NutritionTable.vue'
 import MarkdownBlock from '@/components/MarkdownBlock.vue'
 import AdditionalDishes from '@/components/AdditionalDishes.vue'
+import OverallPanel from '@/components/OverallPanel.vue'
 import { useAppStore } from '@/stores/app'
 import { useResultExport } from '@/composables/useResultExport'
 
@@ -46,6 +47,8 @@ const { savingPng, notice, savePng, saveJson, saveText, copyText } = useResultEx
       <p v-if="props.result.degraded" class="panel__degraded">
         模型本次没有返回标准结构，以下内容已按纯文本兜底展示。
       </p>
+
+      <OverallPanel v-if="props.result.overall" :overall="props.result.overall" />
 
       <div class="panel__block">
         <h4 class="panel__label">营养估算</h4>

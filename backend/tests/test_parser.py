@@ -9,7 +9,13 @@ from __future__ import annotations
 
 import json
 
-from app.services.parser import extract_json_object, extract_partial_advice, parse_model_output
+from app.services.parser import (
+    PartialFieldEmitter,
+    extract_json_object,
+    extract_partial_advice,
+    extract_partial_string,
+    parse_model_output,
+)
 
 VALID = {
     "dish_name": "番茄炒蛋",
@@ -157,3 +163,59 @@ def test_partial_advice_empty_before_advice_key_arrives():
 def test_partial_advice_stops_at_closing_quote():
     text = '{"advice": "内容", "risk_notes": ["不该出现"]}'
     assert extract_partial_advice(text) == "内容"
+
+
+# --------------------------------------------------------------------------
+# extract_partial_string — generalised beyond advice
+# --------------------------------------------------------------------------
+
+
+def test_partial_string_extracts_any_field():
+    text = '{"dish_name": "番茄炒蛋", "advice": "建议"}'
+    assert extract_partial_string(text, "dish_name") == "番茄炒蛋"
+    assert extract_partial_string(text, "advice") == "建议"
+
+
+def test_partial_string_returns_empty_for_absent_field():
+    assert extract_partial_string('{"advice": "x"}', "dish_name") == ""
+
+
+def test_partial_string_does_not_match_a_longer_key():
+    """`dish_name_alternatives` must not be mistaken for `dish_name`."""
+    text = '{"dish_name_alternatives": ["西红柿炒鸡蛋"]}'
+    assert extract_partial_string(text, "dish_name") == ""
+
+
+def test_partial_string_handles_a_partially_written_value():
+    text = '{"dish_name": "番茄炒'
+    assert extract_partial_string(text, "dish_name") == "番茄炒"
+
+
+# --------------------------------------------------------------------------
+# PartialFieldEmitter — per-field incremental deltas
+# --------------------------------------------------------------------------
+
+
+def test_emitter_reports_only_new_text_per_field():
+    emitter = PartialFieldEmitter(("dish_name", "advice"))
+
+    first = emitter.feed('{"dish_name": "番茄')
+    assert first == [("dish_name", "番茄")]
+
+    # Nothing new for either field yet.
+    assert emitter.feed('{"dish_name": "番茄') == []
+
+    second = emitter.feed('{"dish_name": "番茄炒蛋", "advice": "少')
+    assert second == [("dish_name", "炒蛋"), ("advice", "少")]
+
+
+def test_emitter_tracks_fields_independently():
+    emitter = PartialFieldEmitter(("dish_name", "advice"))
+    emitter.feed('{"dish_name": "番茄炒蛋", "advice": "第一段')
+    deltas = emitter.feed('{"dish_name": "番茄炒蛋", "advice": "第一段第二段')
+    assert deltas == [("advice", "第二段")]
+
+
+def test_emitter_emits_nothing_before_a_field_starts():
+    emitter = PartialFieldEmitter(("dish_name", "advice"))
+    assert emitter.feed('{"conf') == []

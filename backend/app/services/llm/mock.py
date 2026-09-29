@@ -43,6 +43,27 @@ _ADVICE_DETAILED = """\
 - 番茄本身含钾较高，需要控制钠摄入的人可以少放盐和酱油。
 """
 
+_OVERALL_QUICK = {
+    "summary": "以蛋白质和番茄为主，蔬菜量偏少，口味偏咸鲜。",
+    "aspects": [
+        {"label": "蛋白质", "level": "偏多", "note": "鸡蛋是这一餐蛋白质的主要来源。"},
+        {"label": "蔬菜", "level": "偏少", "note": "只有番茄，没有绿叶菜。"},
+        {"label": "烹调方式", "level": None, "note": "炒制，咸味主要来自酱油和盐。"},
+    ],
+}
+
+_OVERALL_DETAILED = {
+    "summary": "以蛋白质为主，配菜偏少，主食缺失，口味偏咸鲜。",
+    "aspects": [
+        {"label": "蛋白质", "level": "偏多", "note": "鸡蛋是主要来源，整体比例较高。"},
+        {"label": "蔬菜", "level": "偏少", "note": "只有番茄，没有绿叶菜。"},
+        {"label": "主食", "level": "偏少", "note": "照片里没有看到米饭、面食一类的主食。"},
+        {"label": "烹调方式", "level": None, "note": "炒制，油脂用量从照片无法判断。"},
+        {"label": "口味", "level": None, "note": "番茄的酸味搭配咸鲜，偏家常口味。"},
+    ],
+}
+
+
 # Key order matches what the prompt asks the real model for, so demo mode
 # streams the same way a real call does: `advice` arrives early, which is what
 # makes the partial-advice streaming visible instead of dead air.
@@ -68,6 +89,7 @@ _PAYLOAD_QUICK = {
         "sodium_mg": None,
         "basis": "按图中约 300g 份量、家常做法（含约 15g 食用油）折算",
     },
+    "overall": _OVERALL_QUICK,
     "additional_dishes": [],
     "risk_notes": ["含鸡蛋，对蛋类过敏的人需要留意。", "家常做法用盐和酱油，钠含量取决于调味量。"],
     "uncertainty_notes": [
@@ -101,6 +123,7 @@ _PAYLOAD_DETAILED = {
         "sodium_mg": 620,
         "basis": "按图中约 300g 份量、家常做法（含约 15g 食用油与约 1.5g 食盐）折算",
     },
+    "overall": _OVERALL_DETAILED,
     "additional_dishes": [],
     "risk_notes": [
         "含鸡蛋，对蛋类过敏的人需要留意。",
@@ -132,7 +155,6 @@ _ADDITIONAL_DISH = {
         "sodium_mg": 2,
         "basis": "按图中约 150g 熟米饭折算",
     },
-    "additional_dishes": [],
     "risk_notes": [],
     "uncertainty_notes": ["份量按常见小碗估算。"],
 }

@@ -17,6 +17,7 @@ import type {
   Conversation,
   ConversationMessage,
   ConversationSummary,
+  PartialField,
   ProcessedImage,
   StatusStage,
 } from '@/types/api'
@@ -55,6 +56,7 @@ export const useConversationStore = defineStore('conversation', () => {
   const stage = ref<StatusStage | null>(null)
   const statusMessage = ref('')
   const streamedText = ref('')
+  const streamedDishName = ref('')
   const draft = ref('')
 
   let abort: AbortController | null = null
@@ -140,6 +142,7 @@ export const useConversationStore = defineStore('conversation', () => {
     active.value = null
     turnError.value = null
     streamedText.value = ''
+    streamedDishName.value = ''
   }
 
   function optimisticUserMessage(text: string): ConversationMessage {
@@ -177,6 +180,7 @@ export const useConversationStore = defineStore('conversation', () => {
 
     turnError.value = null
     streamedText.value = ''
+    streamedDishName.value = ''
     stage.value = null
     statusMessage.value = ''
     isResponding.value = true
@@ -204,13 +208,15 @@ export const useConversationStore = defineStore('conversation', () => {
           stage.value = event.stage
           statusMessage.value = event.message
         },
-        onPartial: (chunk) => {
-          streamedText.value += chunk
+        onPartial: (field: PartialField, chunk: string) => {
+          if (field === 'dish_name') streamedDishName.value += chunk
+          else streamedText.value += chunk
         },
         onResult: (message) => {
           conversation.messages.push(message)
           conversation.updated_at = message.created_at
           streamedText.value = ''
+          streamedDishName.value = ''
         },
       })
 
@@ -268,6 +274,7 @@ export const useConversationStore = defineStore('conversation', () => {
     stage,
     statusMessage,
     streamedText,
+    streamedDishName,
     draft,
     hasMessages,
     canSend,

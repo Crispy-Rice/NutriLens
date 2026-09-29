@@ -5,6 +5,7 @@ import ConfidenceBadge from '@/components/ConfidenceBadge.vue'
 import NutritionTable from '@/components/NutritionTable.vue'
 import MarkdownBlock from '@/components/MarkdownBlock.vue'
 import AdditionalDishes from '@/components/AdditionalDishes.vue'
+import OverallPanel from '@/components/OverallPanel.vue'
 import { useAppStore } from '@/stores/app'
 import { useResultExport } from '@/composables/useResultExport'
 import { formatDateTime } from '@/utils/format'
@@ -90,6 +91,8 @@ const imageOps = computed(() => {
       <p v-if="props.result.degraded" class="result__degraded">
         模型本次没有返回标准结构，以下内容已按纯文本兜底展示，部分字段可能缺失。
       </p>
+
+      <OverallPanel v-if="props.result.overall" :overall="props.result.overall" />
 
       <section v-if="props.result.ingredients.length > 0" class="result__block">
         <h3 class="result__label">主要食材</h3>

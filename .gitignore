@@ -27,3 +27,6 @@ dist-ssr/
 .idea/
 .DS_Store
 Thumbs.db
+
+# --- WorkBuddy internal memory (never commit) ---
+.workbuddy/

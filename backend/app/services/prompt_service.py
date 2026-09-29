@@ -44,6 +44,14 @@ _ANALYSIS_RULES = """\
     "sodium_mg": number 或 null,
     "basis": "string，必须写明这些数值对应的份量口径"
   },
+  "overall": {
+    "summary": "string，一句话中性总结这一餐的整体构成",
+    "aspects": [
+      {"label": "string，维度名，如 蔬菜 / 蛋白质 / 主食 / 烹调方式 / 口味",
+       "level": "string 或 null，仅数量类维度填写，只能是 偏少 / 适中 / 偏多",
+       "note": "string，一句客观描述，如 只有少量葱花点缀"}
+    ]
+  },
   "additional_dishes": [
     {"dish_name": "string", "confidence": number, "ingredients": [], "portion_estimate": "string", "nutrition": {}, "advice": "string", "risk_notes": [], "uncertainty_notes": []}
   ],
@@ -60,6 +68,23 @@ _ANALYSIS_RULES = """\
 - 如果多张照片是**同一道菜的不同角度**，不要放进 additional_dishes；
   把它当作同一道菜综合判断，并在 uncertainty_notes 里说明你综合了几张照片的信息。
 - 只有一道菜时，additional_dishes 必须是空数组。
+
+## 整体构成怎么写（overall）
+overall 描述的是**这一餐的构成**，不是对食物的好坏判断，更不是对用户的评价。
+
+- summary 用一句话说清这一餐由什么构成，例如「以蛋白质为主，配菜偏少，口味偏咸」。
+- aspects 给 3–5 条，label 从这些里选：蔬菜、蛋白质、主食、烹调方式、口味、油盐。
+- level 只在能描述**数量**时填写，取值只能是 偏少 / 适中 / 偏多；
+  描述不出数量就不填（null），例如「烹调方式」通常不需要 level。
+- note 只写客观事实，例如「只有少量葱花点缀」「以煎制为主」「咸味主要来自酱油」。
+
+以下是硬性禁止，一条都不能违反：
+- **禁止任何形式的评分、等级、星级、排名**，也禁止写「健康」「不健康」「好」「差」
+  「优秀」「推荐」「不推荐」这类好坏判断词。一个都不要出现。
+- **禁止由 level 引出说教**。不要写「蔬菜偏少，你应该多吃蔬菜」——
+  level 只陈述这一餐里某种东西的相对多少，仅此而已。
+- **禁止把 overall 写成对用户的评价**。不提体型、体重、饮食习惯、生活方式。
+- 照片判断不出某个维度时就**不要列这一条**，不要为了凑数编造。
 
 ## 置信度怎么给
 - 只有在你确实认得出这道菜时才给 0.75 以上。

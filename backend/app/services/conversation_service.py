@@ -33,7 +33,7 @@ from app.schemas import (
 from app.services.analysis_service import Timings, log_timings, profile_in_use, finalize
 from app.services.image_service import PreparedImage
 from app.services.llm.base import ChatTurn, VisionProvider, VisionRequest
-from app.services.parser import extract_partial_advice
+from app.services.parser import PartialFieldEmitter
 from app.services.prompt_service import (
     build_chat_system_prompt,
     build_chat_user_prompt,
@@ -151,18 +151,21 @@ async def stream_turn(
     )
 
     collected: list[str] = []
-    emitted = 0
+    # An analysis turn streams the dish name and the advice as they are written;
+    # a chat turn streams its whole reply, already in the form the user reads.
+    emitter = PartialFieldEmitter(("dish_name", "advice"))
+    chat_sent = 0
     started = time.perf_counter()
 
     async for piece in provider.astream(request):
         collected.append(piece)
         raw = "".join(collected)
-        # An analysis turn streams only the advice field; a chat turn streams
-        # its whole reply, already in the form the user will read.
-        so_far = extract_partial_advice(raw) if is_analysis else raw
-        if len(so_far) > emitted:
-            yield ("partial", {"text": so_far[emitted:]})
-            emitted = len(so_far)
+        if is_analysis:
+            for field, delta in emitter.feed(raw):
+                yield ("partial", {"field": field, "text": delta})
+        elif len(raw) > chat_sent:
+            yield ("partial", {"field": "reply", "text": raw[chat_sent:]})
+            chat_sent = len(raw)
 
     model_ms = int((time.perf_counter() - started) * 1000)
     raw_text = "".join(collected)

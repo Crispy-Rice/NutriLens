@@ -220,9 +220,29 @@ async def test_both_turn_types_emit_status_before_completion():
 
 async def test_analysis_turn_streams_advice_partials():
     events = await collect(Conversation(id="c1", title="t"), images=[make_image()])
-    joined = "".join(p["text"] for p in events.get("partial", []))
-    assert joined
-    assert joined in events["completed"][0]["analysis"]["advice"]
+    advice = "".join(p["text"] for p in events.get("partial", []) if p["field"] == "advice")
+    assert advice
+    assert advice in events["completed"][0]["analysis"]["advice"]
+
+
+async def test_analysis_turn_also_streams_the_dish_name():
+    """The name is written first, so the progress view can show it early."""
+    events = await collect(Conversation(id="c1", title="t"), images=[make_image()])
+    names = "".join(p["text"] for p in events.get("partial", []) if p["field"] == "dish_name")
+    assert names
+    assert names == events["completed"][0]["analysis"]["dish_name"]
+    # And it arrives before the advice finishes, by definition of field order.
+    fields = [p["field"] for p in events.get("partial", [])]
+    assert fields.index("dish_name") <= fields.index("advice")
+
+
+async def test_chat_turn_partials_use_the_reply_field():
+    """A chat turn has no JSON, so its whole reply streams under one field."""
+    events = await collect(Conversation(id="c1", title="t"), user_text="怎么更清淡？")
+    partials = events.get("partial", [])
+    assert partials
+    assert {p["field"] for p in partials} == {"reply"}
+    assert "".join(p["text"] for p in partials) == events["completed"][0]["assistant_text"]
 
 
 # --------------------------------------------------------------------------

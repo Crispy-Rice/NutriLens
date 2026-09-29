@@ -6,7 +6,7 @@
  */
 
 import { toPng } from 'html-to-image'
-import type { AnalysisResult, DishAnalysis } from '@/types/api'
+import type { AnalysisResult, DishAnalysis, MealOverall } from '@/types/api'
 import { slugifyForFilename } from '@/utils/format'
 
 function timestamp(): string {
@@ -110,6 +110,16 @@ function dishLines(dish: DishAnalysis, indent = ''): string[] {
   return lines
 }
 
+function overallLines(overall: MealOverall): string[] {
+  const lines = ['— 这一餐的整体构成 —']
+  if (overall.summary) lines.push(overall.summary)
+  for (const aspect of overall.aspects) {
+    const level = aspect.level ? `（${aspect.level}）` : ''
+    lines.push(`· ${aspect.label}${level} ${aspect.note}`.trim())
+  }
+  return lines
+}
+
 /** A plain-text summary — the paste-into-a-note version. */
 export function buildPlainText(result: AnalysisResult): string {
   const lines: string[] = [
@@ -122,6 +132,14 @@ export function buildPlainText(result: AnalysisResult): string {
   }
   if (result.profile_used) {
     lines.push('本次参考了你的饮食画像（画像内容不会保存）')
+  }
+  // Stated plainly: without it the numbers below would read as model output.
+  if (result.edited) {
+    lines.push('※ 识别内容已由用户手动修正；营养数值仍为模型按原始识别估算')
+  }
+
+  if (result.overall && (result.overall.summary || result.overall.aspects.length)) {
+    lines.push('', ...overallLines(result.overall))
   }
 
   lines.push('')

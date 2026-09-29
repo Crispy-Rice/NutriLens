@@ -15,12 +15,11 @@ from dataclasses import dataclass, field
 
 from pydantic import ValidationError
 
-from app.schemas import MealAnalysis
+from app.schemas import MealAnalysis, MealOverall
 
 logger = logging.getLogger(__name__)
 
 _FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
-_ADVICE_KEY = re.compile(r'"advice"\s*:\s*"')
 _TRAILING_COMMA = re.compile(r",\s*([}\]])")
 _SMART_QUOTES = str.maketrans({"“": '"', "”": '"', "‘": "'", "’": "'"})
 
@@ -178,6 +177,7 @@ def _salvage(payload: dict, raw_text: str) -> MealAnalysis | None:
             ingredients=[],
             portion_estimate=None,
             additional_dishes=[],
+            overall=MealOverall(),
             advice=raw_text.strip()[:4000],
             risk_notes=[],
             uncertainty_notes=["模型返回的结构不完整，建议重新拍摄后再试一次。"],
@@ -186,14 +186,19 @@ def _salvage(payload: dict, raw_text: str) -> MealAnalysis | None:
         return None
 
 
-def extract_partial_advice(buffer: str) -> str:
-    """Pull the ``advice`` string out of a partially-streamed JSON object.
+def extract_partial_string(buffer: str, key: str) -> str:
+    """Pull one string field out of a partially-streamed JSON object.
 
     Streaming raw JSON at the user would be unreadable, so the SSE layer feeds
-    accumulating model output through this and emits only the advice text as it
+    accumulating model output through this and emits only the field's text as it
     grows. Incomplete escapes at the tail are held back until more arrives.
+
+    Works on ``dish_name`` as well as ``advice``: the model writes fields in the
+    order we ask for, so the dish name is known long before the JSON closes, and
+    showing it early lets the progress view name the dish instead of showing an
+    empty skeleton.
     """
-    match = _ADVICE_KEY.search(buffer)
+    match = re.compile(rf'"{re.escape(key)}"\s*:\s*"').search(buffer)
     if not match:
         return ""
 
@@ -228,3 +233,31 @@ def extract_partial_advice(buffer: str) -> str:
         index += 1
 
     return "".join(chars)
+
+
+def extract_partial_advice(buffer: str) -> str:
+    return extract_partial_string(buffer, "advice")
+
+
+class PartialFieldEmitter:
+    """Tracks what has already been sent for each streamed field.
+
+    Model output grows monotonically, so each poll re-extracts the whole field;
+    this keeps only the new tail per field, and keeps that bookkeeping out of
+    both streaming services.
+    """
+
+    def __init__(self, fields: tuple[str, ...]) -> None:
+        self._fields = fields
+        self._sent: dict[str, int] = {field: 0 for field in fields}
+
+    def feed(self, buffer: str) -> list[tuple[str, str]]:
+        """Return ``(field, new_text)`` for anything that grew since last time."""
+        deltas: list[tuple[str, str]] = []
+        for field in self._fields:
+            value = extract_partial_string(buffer, field)
+            already = self._sent[field]
+            if len(value) > already:
+                deltas.append((field, value[already:]))
+                self._sent[field] = len(value)
+        return deltas

@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useImageSelection } from '@/composables/useImageSelection'
 import { useAppStore } from '@/stores/app'
 import { useProfileStore } from '@/stores/profile'
-import type { AnalysisResult, AnalysisMode, StatusStage } from '@/types/api'
+import type { AnalysisResult, AnalysisMode, PartialField, StatusStage } from '@/types/api'
 import { toApiError, type ApiError } from '@/api/client'
 import { streamAnalyze } from '@/api/stream'
 
@@ -34,6 +34,9 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const stage = ref<StatusStage | null>(null)
   const statusMessage = ref('')
   const streamedText = ref('')
+  // The dish name is written before the rest of the JSON, so the progress view
+  // can name the dish instead of showing an empty placeholder.
+  const streamedDishName = ref('')
   const result = ref<AnalysisResult | null>(null)
 
   let abortController: AbortController | null = null
@@ -50,6 +53,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     stage.value = null
     statusMessage.value = ''
     streamedText.value = ''
+    streamedDishName.value = ''
     result.value = null
   }
 
@@ -105,8 +109,9 @@ export const useAnalysisStore = defineStore('analysis', () => {
           stage.value = event.stage
           statusMessage.value = event.message
         },
-        onPartial: (text) => {
-          streamedText.value += text
+        onPartial: (field: PartialField, text: string) => {
+          if (field === 'dish_name') streamedDishName.value += text
+          else streamedText.value += text
         },
         onResult: (payload) => {
           result.value = payload
@@ -144,6 +149,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     stage,
     statusMessage,
     streamedText,
+    streamedDishName,
     result,
     hasImages,
     isAnalyzing,

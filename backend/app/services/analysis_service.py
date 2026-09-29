@@ -29,7 +29,7 @@ from app.schemas import (
 )
 from app.services.image_service import PreparedImage
 from app.services.llm.base import CallMetrics, VisionProvider, VisionRequest
-from app.services.parser import extract_partial_advice, parse_model_output
+from app.services.parser import PartialFieldEmitter, parse_model_output
 from app.services.prompt_service import build_system_prompt, build_user_prompt
 
 logger = logging.getLogger(__name__)
@@ -224,6 +224,9 @@ def _from_meal(
         ingredients=meal.ingredients,
         portion_estimate=meal.portion_estimate,
         nutrition=meal.nutrition,
+        # An overall with neither a summary nor any aspect is the same as none,
+        # and rendering an empty section would be worse than omitting it.
+        overall=meal.overall if not meal.overall.is_empty else None,
         additional_dishes=meal.additional_dishes,
         advice=meal.advice,
         risk_notes=meal.risk_notes,
@@ -367,15 +370,15 @@ async def stream_analysis(
     yield ("status", {"stage": "calling_model", "message": "正在识别菜品与食材…"})
 
     collected: list[str] = []
-    emitted_length = 0
+    # The dish name is emitted well before the JSON closes, so the progress view
+    # can show the real name instead of an empty placeholder.
+    emitter = PartialFieldEmitter(("dish_name", "advice"))
     started = time.perf_counter()
 
     async for piece in provider.astream(request):
         collected.append(piece)
-        advice_so_far = extract_partial_advice("".join(collected))
-        if len(advice_so_far) > emitted_length:
-            yield ("partial", {"text": advice_so_far[emitted_length:]})
-            emitted_length = len(advice_so_far)
+        for field, delta in emitter.feed("".join(collected)):
+            yield ("partial", {"field": field, "text": delta})
 
     model_ms = _ms_since(started)
     raw_text = "".join(collected)

@@ -60,6 +60,79 @@ class Ingredient(BaseModel):
     note: str | None = None
 
 
+# --------------------------------------------------------------------------
+# Meal overall
+#
+# A dimension-by-dimension description of the meal as a whole. This is the part
+# of the product closest to becoming a judgement, so the shape itself keeps it
+# descriptive: there is no score, grade or rank anywhere, and `level` is only
+# ever a quantity word (偏少 / 适中 / 偏多) — never a quality word. The UI must
+# not colour it green-or-red either, or "偏少" becomes a grade in disguise.
+# --------------------------------------------------------------------------
+
+ASPECT_MAX = 6
+ASPECT_LABEL_CHARS = 12
+ASPECT_LEVEL_CHARS = 6
+ASPECT_NOTE_CHARS = 80
+OVERALL_SUMMARY_CHARS = 240
+
+
+class MealAspect(BaseModel):
+    """One dimension, e.g. 蔬菜「偏少 —— 只有少量葱花点缀」."""
+
+    label: str = ""
+    #: Quantity only. None for dimensions where a quantity word makes no sense
+    #: (such as 烹调方式).
+    level: str | None = None
+    note: str = ""
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def _clean_label(cls, v: object) -> str:
+        return str(v or "").strip()[:ASPECT_LABEL_CHARS]
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def _clean_level(cls, v: object) -> str | None:
+        if v is None:
+            return None
+        text = str(v).strip()[:ASPECT_LEVEL_CHARS]
+        return text or None
+
+    @field_validator("note", mode="before")
+    @classmethod
+    def _clean_note(cls, v: object) -> str:
+        return str(v or "").strip()[:ASPECT_NOTE_CHARS]
+
+
+class MealOverall(BaseModel):
+    summary: str = ""
+    aspects: list[MealAspect] = Field(default_factory=list)
+
+    @field_validator("summary", mode="before")
+    @classmethod
+    def _clean_summary(cls, v: object) -> str:
+        return str(v or "").strip()[:OVERALL_SUMMARY_CHARS]
+
+    @field_validator("aspects", mode="before")
+    @classmethod
+    def _clean_aspects(cls, v: object) -> list[MealAspect]:
+        if not isinstance(v, list):
+            return []
+        out: list[MealAspect] = []
+        for raw in v[:ASPECT_MAX]:
+            if isinstance(raw, MealAspect):
+                out.append(raw)
+            elif isinstance(raw, dict):
+                out.append(MealAspect.model_validate(raw))
+            # Anything else is dropped rather than failing the whole result.
+        return out
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.aspects and not self.summary
+
+
 class DishAnalysis(BaseModel):
     """One dish's analysis.
 
@@ -114,6 +187,9 @@ class MealAnalysis(DishAnalysis):
     can't itself contain additional dishes.
     """
 
+    #: Describes the meal as a whole, which is where a multi-dish spread is
+    #: actually useful to summarise.
+    overall: MealOverall = Field(default_factory=MealOverall)
     additional_dishes: list[DishAnalysis] = Field(default_factory=list)
 
 
@@ -148,6 +224,9 @@ class AnalysisResult(BaseModel):
     ingredients: list[Ingredient] = Field(default_factory=list)
     portion_estimate: str | None = None
     nutrition: Nutrition = Field(default_factory=Nutrition)
+    #: Dimension-by-dimension view of the meal. None for results recorded before
+    #: this existed, and for replies that didn't include one.
+    overall: MealOverall | None = None
     # Other dishes identified in the same photos. Empty when the meal is a
     # single dish, which is the common case.
     additional_dishes: list[DishAnalysis] = Field(default_factory=list)
@@ -167,6 +246,10 @@ class AnalysisResult(BaseModel):
     # True when a user profile informed this result. The profile's contents are
     # never stored, here or anywhere else.
     profile_used: bool = False
+    #: True once the user has corrected the recognition by hand. Surfaced on the
+    #: card, in history and in exports — without it, presenting edited values
+    #: under an "AI estimate" disclaimer would be misleading.
+    edited: bool = False
 
 
 class AnalysisSummary(BaseModel):
@@ -185,6 +268,75 @@ class HistoryPage(BaseModel):
     total: int = 0
     limit: int = 20
     offset: int = 0
+
+
+#: Limits for a hand-corrected result.
+EDIT_MAX_INGREDIENTS = 20
+EDIT_MAX_NAME_CHARS = 60
+EDIT_MAX_AMOUNT_CHARS = 40
+EDIT_MAX_NOTE_CHARS = 60
+EDIT_MAX_PORTION_CHARS = 80
+
+
+class AnalysisEditRequest(BaseModel):
+    """The fields a user may correct by hand.
+
+    Deliberately excludes the nutrition numbers and the advice text: those are
+    derived from the ingredients, and letting them be edited independently would
+    leave a card whose parts contradict each other under an "AI estimate"
+    disclaimer. Editing the ingredients is the meaningful correction.
+    """
+
+    dish_name: str
+    ingredients: list[Ingredient] = Field(default_factory=list)
+    portion_estimate: str | None = None
+
+    @field_validator("dish_name", mode="before")
+    @classmethod
+    def _clean_dish_name(cls, v: object) -> str:
+        text = str(v or "").strip()[:EDIT_MAX_NAME_CHARS]
+        if not text:
+            raise ValueError("dish_name must not be empty")
+        return text
+
+    @field_validator("portion_estimate", mode="before")
+    @classmethod
+    def _clean_portion(cls, v: object) -> str | None:
+        if v is None:
+            return None
+        text = str(v).strip()[:EDIT_MAX_PORTION_CHARS]
+        return text or None
+
+    @field_validator("ingredients", mode="before")
+    @classmethod
+    def _clean_ingredients(cls, v: object) -> list[Ingredient]:
+        if not isinstance(v, list):
+            return []
+
+        out: list[Ingredient] = []
+        for raw in v:
+            if isinstance(raw, Ingredient):
+                item = raw
+            elif isinstance(raw, dict):
+                item = Ingredient.model_validate(raw)
+            else:
+                continue
+
+            name = (item.name or "").strip()[:EDIT_MAX_NAME_CHARS]
+            if not name:
+                # A blank row in the edit form means "removed", not an error.
+                continue
+            amount = (item.estimated_amount or "").strip()[:EDIT_MAX_AMOUNT_CHARS]
+            out.append(
+                Ingredient(
+                    name=name,
+                    estimated_amount=amount or None,
+                    note=(item.note or "").strip()[:EDIT_MAX_NOTE_CHARS] or None,
+                )
+            )
+            if len(out) >= EDIT_MAX_INGREDIENTS:
+                break
+        return out
 
 
 # --------------------------------------------------------------------------

@@ -4,7 +4,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=ubuntu
+# 以 root 运行：uv 创建的 .venv 解释器在该服务器上缺少执行位（umask 偏严），
+# 改属主/补权限后仍偶发 Permission denied；root 可绕过权限链，最稳。
+User=root
 WorkingDirectory=/home/ubuntu/nutrilens/backend
 # 注意：workers=1，因为 SSE 流式接口（/api/analyze/stream、对话轮次流）
 # 必须单进程，多进程会弄乱流。端口 8010 是本项目在 day05 的默认后端端口。
@@ -12,8 +14,8 @@ ExecStart=/home/ubuntu/nutrilens/backend/.venv/bin/uvicorn app.main:app --host 1
 Restart=always
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
-Environment=HOME=/home/ubuntu
-EnvironmentFile=/home/ubuntu/nutrilens/.env
+Environment=HOME=/root
+EnvironmentFile=/home/ubuntu/nutrilens/backend/.env
 
 [Install]
 WantedBy=multi-user.target
