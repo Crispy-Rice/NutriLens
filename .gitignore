@@ -30,3 +30,6 @@ Thumbs.db
 
 # --- WorkBuddy internal memory (never commit) ---
 .workbuddy/
+
+# --- 部署专用私钥（仅本地，用于配置 GitHub Secret，切勿提交） ---
+_nutrilens_key
